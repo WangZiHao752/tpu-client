@@ -9,6 +9,22 @@ import selfsigned from 'selfsigned';
 // create self signed pems for quic
 const pems = selfsigned.generate([{name: 'commonName', value: 'Solana node'}, { name: "subjectAltName", value: [{ type: 7, value: "0.0.0.0" }]}], { days: 365, algorithm: 'ed25519', keySize: 2048 });
 
+export const isLegacyRawTransaction = (rawTransaction: Buffer | number[] | Uint8Array ) => {
+    const txBuffer = Buffer.from(rawTransaction);
+    // 获取第一个字节
+    const firstByte = txBuffer[0];
+    
+    // 检查前三位是否为 0 (0b00000xxx)
+    const prefix = firstByte >> 5;  // 右移5位检查前3位
+    
+    if (prefix !== 0) {
+        // 前三位不是0，一定是旧版本交易
+       return true;
+    }
+    // 前三位是0，可能是v0交易
+    return false;
+    
+}
 export class LeaderTpuCache {
     leaderTpuMap: Map<string, string>;
     connection: Connection;
@@ -332,8 +348,19 @@ export class TpuClient {
      * @returns 
      */
     async sendAbortableRawTransaction(rawTransaction: Buffer | number[] | Uint8Array) : Promise<{ signature: TransactionSignature, abortControllers: AbortController[] }> {
-        const message = Transaction.from(rawTransaction);
-        const signature = base58.encode(Uint8Array.from(message.signature));
+        const isLegacy = isLegacyRawTransaction(rawTransaction);
+        let signature = '';
+        if (isLegacy) {
+            const message = Transaction.from(rawTransaction);
+            signature = base58.encode(Uint8Array.from(message.signature));
+        } else {
+            // @ts-ignore 
+            const message = VersionedTransaction.deserialize(rawTransaction);
+            signature = base58.encode(Uint8Array.from(message.signatures[0]));
+        }
+        console.log(
+            'signature:',signature
+        );
         const tpu_addresses = await this.leaderTpuService.leaderTpuSockets(this.fanoutSlots);
         const logger = new Logger(signature, 4);
         const webcrypto = new peculiarWebcrypto.Crypto();
@@ -357,8 +384,19 @@ export class TpuClient {
      */
     async sendRawTransaction(rawTransaction: Buffer | number[] | Uint8Array) : Promise<TransactionSignature> {
 
-        const message = Transaction.from(rawTransaction);
-        const signature = base58.encode(Uint8Array.from(message.signature));
+        const isLegacy = isLegacyRawTransaction(rawTransaction);
+        let signature = '';
+        if (isLegacy) {
+            const message = Transaction.from(rawTransaction);
+            signature = base58.encode(Uint8Array.from(message.signature));
+        } else {
+            // @ts-ignore 
+            const message = VersionedTransaction.deserialize(rawTransaction);
+            signature = base58.encode(Uint8Array.from(message.signatures[0]));
+        }
+        console.log(
+            'signature:',signature
+        );
         const tpu_addresses = await this.leaderTpuService.leaderTpuSockets(this.fanoutSlots);
         const logger = new Logger(signature, 4);
         const webcrypto = new peculiarWebcrypto.Crypto();

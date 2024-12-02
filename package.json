@@ -2,6 +2,7 @@
   "name": "tpu-client",
   "version": "1.0.5",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "author": " <lmvanderzande@gmail.com>",
   "license": "MIT",
   "dependencies": {
@@ -31,7 +32,8 @@
     "prettify:fix": "prettier --write './src/**/*.ts'",
     "lint": "eslint . --ext ts --quiet",
     "lint:fix": "eslint . --ext ts --fix",
-    "test": "ts-node test/index.ts"
+    "test:ts": "ts-node test/index.ts",
+    "test:bun": "bun run test/index.ts"
   },
   "directories": {
     "lib": "lib"
