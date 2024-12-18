@@ -304,7 +304,7 @@ export class TpuClient {
             await writer.write(Uint8Array.from(rawTransaction as Buffer));
             await writer.close();
             if (abortController) {
-                abortController.signal.addEventListener('abort', () => {
+                abortController?.signal?.addEventListener('abort', () => {
                     if (writer) {
                         if (!writer.closed) {
                             writer.close();
@@ -317,7 +317,7 @@ export class TpuClient {
             }
             // console.log('closed', index);
         } catch (error) {
-            if (!abortController.signal.aborted) {
+            if (!abortController?.signal?.aborted) {
 
                 if (error.data.errorCode === 2) {
                     console.error('connection refused', tpu_address);
@@ -394,9 +394,6 @@ export class TpuClient {
             const message = VersionedTransaction.deserialize(rawTransaction);
             signature = base58.encode(Uint8Array.from(message.signatures[0]));
         }
-        console.log(
-            'signature:',signature
-        );
         const tpu_addresses = await this.leaderTpuService.leaderTpuSockets(this.fanoutSlots);
         const logger = new Logger(signature, 4);
         const webcrypto = new peculiarWebcrypto.Crypto();
@@ -574,11 +571,19 @@ export class TpuConnection extends Connection {
         const signature = await this.sendTransaction(transaction, signers);
         const status = (await this.confirmTransaction(signature, options.commitment)).value;
         if (status.err) {
-            throw new Error(`Transaction ${signature} failed (${JSON.stringify(status)})`);
+            return {
+              ok: false,
+              signature
+            }
+            console.log(`Transaction ${signature} failed (${JSON.stringify(status)})`);
+            // throw new Error(`Transaction ${signature} failed (${JSON.stringify(status)})`);
         } else {
-            console.log(`Transaction Confirmed https://solana.fm/tx/${signature}`);
+            console.log(`Transaction Confirmed https://solscan.io/tx/${signature}`);
         }
-        return signature;
+        return {
+            ok: true,
+            signature
+        };
     }
 
     //@ts-check
@@ -593,11 +598,19 @@ export class TpuConnection extends Connection {
         const signature = await this.sendRawTransaction(rawTransaction);
         const status = (await this.confirmTransaction(signature, options.commitment)).value;
         if (status.err) {
-            throw new Error(`Transaction ${signature} failed (${JSON.stringify(status)})`);
+            return {
+              ok: false,
+              signature
+            }
+            console.log(`Transaction ${signature} failed (${JSON.stringify(status)})`);
         } else {
-            console.log(`Transaction Confirmed https://solana.fm/tx/${signature}`);
+            console.log(`Transaction Confirmed https://solscan.io/tx/${signature}`);
         }
-        return signature;
+
+        return {
+            ok: true,
+            signature
+        }
     }
 
     /**
@@ -609,7 +622,7 @@ export class TpuConnection extends Connection {
      */
     async sendAndConfirmAbortableTransaction(transaction: Transaction | VersionedTransaction, signers: Array<Signer> | SendOptions, sendOptions?: SendOptions) : Promise<TransactionSignature>  {
         const { signature, abortControllers, blockhash } = await this.tpuClient.sendAbortableTransaction(transaction, signers, sendOptions);
-        console.log(`sent tx: https://solana.fm/tx/${signature}`);
+        console.log(`sent tx: https://solscan.io/tx/${signature}`);
         try {
             if (!('version' in transaction)) {
                 let status: SignatureResult;
@@ -625,18 +638,25 @@ export class TpuConnection extends Connection {
                     status = (await this.confirmTransaction(signature, 'processed')).value;
                 }
                 if (status.err === null) {
-                    console.log(`Transaction Processed https://solana.fm/tx/${signature}`);
-                    abortControllers.forEach(controller => controller.abort());
-                    return signature;
+                    console.log(`Transaction Processed https://solscan.io/tx/${signature}`);
+                    abortControllers.forEach(controller => controller?.abort());
+                    return {
+                        ok: true,
+                        signature
+                    };
+                    
                 } else {
                     console.error(status.err);
-                    abortControllers.forEach(controller => controller.abort());
+                    abortControllers.forEach(controller => controller?.abort());
                 }
             }
         } catch (error) {
             console.error(error);
         }
-        return signature;
+        return {
+            ok: true,
+            signature
+        };
     }
 
     /**
@@ -654,7 +674,7 @@ export class TpuConnection extends Connection {
             status = (await this.confirmTransaction(signature, 'processed')).value;
         }
         if (status.err === null) {
-            console.log(`Transaction Processed https://solana.fm/tx/${signature}`);
+            console.log(`Transaction Processed https://solscan.io/tx/${signature}`);
             abortControllers.forEach(controller => controller.abort());
             return signature;
         } else {
